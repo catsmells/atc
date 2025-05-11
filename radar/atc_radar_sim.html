@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATC Radar Simulator by Dr. Cat</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            overflow: hidden;
+        }
+        canvas {
+            border: 1px solid #0f0;
+            background-color: #000;
+        }
+        .controls {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+        }
+        .panel {
+            background-color: #111;
+            padding: 10px;
+            border: 1px solid #0f0;
+            width: 300px;
+        }
+        .panel h3 {
+            margin: 0 0 10px;
+        }
+        .panel label, .panel input, .panel button, .panel select {
+            margin: 5px;
+            font-size: 14px;
+        }
+        input[type="text"], input[type="number"], select {
+            background-color: #222;
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 5px;
+            width: 200px;
+        }
+        button {
+            background-color: #0f0;
+            color: #000;
+            border: none;
+            padding: 8px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0a0;
+        }
+        select {
+            background-color: #222;
+            color: #0f0;
+        }
+        #flightList, #weatherList, #runwayList, #taxiwayList, #gateList {
+            margin-top: 10px;
+            max-height: 100px;
+            overflow-y: auto;
+            background-color: #222;
+            color: #0f0;
+            border: 1px solid #0f0;
+        }
+        #utcTime {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 16px;
+            color: #0f0;
+        }
+    </style>
+</head>
+<body>
+    <div id="utcTime"></div>
+    <canvas id="radarCanvas" width="800" height="600"></canvas>
+    <div class="controls">
+        <div class="panel">
+            <h3>Flight Controls</h3>
+            <label>Callsign: <input type="text" id="callsign" placeholder="e.g., UAL123"></label>
+            <label>Altitude (FL): <input type="number" id="altitude" value="350" min="10" max="450" step="10"></label>
+            <label>Speed (kts): <input type="number" id="speed" value="450" min="100" max="600"></label>
+            <label>Heading (°): <input type="number" id="heading" value="0" min="0" max="359"></label>
+            <label>X (NM): <input type="number" id="xPos" value="0" min="-50" max="50"></label>
+            <label>Y (NM): <input type="number" id="yPos" value="0" min="-50" max="50"></label>
+            <button onclick="addFlight()">Add Flight</button>
+            <h3>Manage Flights</h3>
+            <select id="flightList" size="4"></select>
+            <label>New Heading (°): <input type="number" id="newHeading" min="0" max="359"></label>
+            <label>New Altitude (FL): <input type="number" id="newAltitude" min="10" max="450" step="10"></label>
+            <label>New Speed (kts): <input type="number" id="newSpeed" min="100" max="600"></label>
+            <button onclick="updateFlight()">Update Flight</button>
+            <button onclick="removeFlight()">Remove Flight</button>
+        </div>
+        <div class="panel">
+            <h3>Weather Controls</h3>
+            <label>Weather ID: <input type="text" id="weatherId" placeholder="e.g., STORM1"></label>
+            <label>X Center (NM): <input type="number" id="weatherX" value="0" min="-50" max="50"></label>
+            <label>Y Center (NM): <input type="number" id="weatherY" value="0" min="-50" max="50"></label>
+            <label>Radius (NM): <input type="number" id="weatherRadius" value="10" min="1" max="20"></label>
+            <label>Severity: 
+                <select id="weatherSeverity">
+                    <option value="light">Light</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="severe">Severe</option>
+                </select>
+            </label>
+            <button onclick="addWeather()">Add Weather</button>
+            <select id="weatherList" size="4"></select>
+            <button onclick="removeWeather()">Remove Weather</button>
+        </div>
+        <div class="panel">
+            <h3>Airport Controls</h3>
+            <label>Runway Name: <input type="text" id="runwayName" placeholder="e.g., 27L"></label>
+            <label>X1 (NM): <input type="number" id="runwayX1" value="0" min="-50" max="50"></label>
+            <label>Y1 (NM): <input type="number" id="runwayY1" value="0" min="-50" max="50"></label>
+            <label>X2 (NM): <input type="number" id="runwayX2" value="5" min="-50" max="50"></label>
+            <label>Y2 (NM): <input type="number" id="runwayY2" value="0" min="-50" max="50"></label>
+            <button onclick="addRunway()">Add Runway</button>
+            <select id="runwayList" size="2"></select>
+            <button onclick="removeRunway()">Remove Runway</button>
+            <label>Taxiway Name: <input type="text" id="taxiwayName" placeholder="e.g., A"></label>
+            <label>Points (x,y;...): <input type="text" id="taxiwayPoints" placeholder="x1,y1;x2,y2"></label>
+            <button onclick="addTaxiway()">Add Taxiway</button>
+            <select id="taxiwayList" size="2"></select>
+            <button onclick="removeTaxiway()">Remove Taxiway</button>
+            <label>Gate Name: <input type="text" id="gateName" placeholder="e.g., A1"></label>
+            <label>X (NM): <input type="number" id="gateX" value="0" min="-50" max="50"></label>
+            <label>Y (NM): <input type="number" id="gateY" value="0" min="-50" max="50"></label>
+            <button onclick="addGate()">Add Gate</button>
+            <select id="gateList" size="2"></select>
+            <button onclick="removeGate()">Remove Gate</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('radarCanvas');
+        const ctx = canvas.getContext('2d');
+        const flights = [];
+        const weatherAreas = [];
+        const runways = [];
+        const taxiways = [];
+        const gates = [];
+        let sweepAngle = 0;
+        const scale = 8;
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const historyTrails = new Map();
+        class Flight {
+            constructor(callsign, x, y, speed, heading, altitude) {
+                this.callsign = callsign;
+                this.x = x;
+                this.y = y;
+                this.speed = speed / 3600;
+                this.baseSpeed = this.speed;
+                this.heading = heading * Math.PI / 180;
+                this.targetHeading = this.heading;
+                this.altitude = altitude * 100;
+                this.targetAltitude = this.altitude;
+                this.climbRate = 0;
+                this.history = [];
+            }
+            update(deltaTime) {
+                let inWeather = false;
+                let avoidHeading = null;
+                weatherAreas.forEach(weather => {
+                    const dist = Math.hypot(this.x - weather.x, this.y - weather.y);
+                    if (dist < weather.radius) {
+                        inWeather = true;
+                        if (weather.severity === 'severe') {
+                            const angleToWeather = Math.atan2(weather.y - this.y, weather.x - this.x);
+                            avoidHeading = angleToWeather + (Math.random() > 0.5 ? 1 : -1) * Math.PI / 6; // ±30°
+                        } else if (weather.severity === 'moderate') {
+                            this.speed = this.baseSpeed * 0.8;
+                        }
+                    }
+                });
+                if (!inWeather) {
+                    this.speed = this.baseSpeed;
+                }
+                const turnRate = 3 * Math.PI / 180; // 3°/s
+                const effectiveTarget = avoidHeading !== null ? avoidHeading : this.targetHeading;
+                if (this.heading !== effectiveTarget) {
+                    const deltaHeading = (effectiveTarget - this.heading + Math.PI * 2) % (Math.PI * 2);
+                    const turn = Math.min(Math.abs(deltaHeading), turnRate * deltaTime) * Math.sign(deltaHeading);
+                    this.heading = (this.heading + turn) % (Math.PI * 2);
+                }
+                const maxClimbRate = 2000 / 60;
+                if (this.altitude !== this.targetAltitude) {
+                    const deltaAlt = this.targetAltitude - this.altitude;
+                    this.climbRate = Math.min(Math.abs(deltaAlt), maxClimbRate * deltaTime) * Math.sign(deltaAlt);
+                    this.altitude += this.climbRate;
+                }
+                this.x += Math.cos(this.heading) * this.speed * deltaTime;
+                this.y += Math.sin(this.heading) * this.speed * deltaTime;
+                if (!this.history.length || (this.history[this.history.length - 1].time + 4) < (performance.now() / 1000)) {
+                    this.history.push({ x: this.x, y: this.y, time: performance.now() / 1000 });
+                    if (this.history.length > 5) this.history.shift();
+                }
+                if (Math.hypot(this.x, this.y) > 50) {
+                    return false;
+                }
+                return true;
+            }
+        }
+        class Weather {
+            constructor(id, x, y, radius, severity) {
+                this.id = id;
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.severity = severity;
+            }
+        }
+        function addFlight() {
+            const callsign = document.getElementById('callsign').value.trim().toUpperCase();
+            const altitude = parseFloat(document.getElementById('altitude').value);
+            const speed = parseFloat(document.getElementById('speed').value);
+            const heading = parseFloat(document.getElementById('heading').value);
+            const x = parseFloat(document.getElementById('xPos').value);
+            const y = parseFloat(document.getElementById('yPos').value);
+            if (callsign && !isNaN(altitude) && !isNaN(speed) && !isNaN(heading) && !isNaN(x) && !isNaN(y)) {
+                flights.push(new Flight(callsign, x, y, speed, heading, altitude));
+                updateFlightList();
+                document.getElementById('callsign').value = '';
+            } else {
+                alert('Please fill in all fields correctly.');
+            }
+        }
+        function updateFlight() {
+            const select = document.getElementById('flightList');
+            const index = select.selectedIndex;
+            if (index === -1) return;
+            const flight = flights[index];
+            const newHeading = parseFloat(document.getElementById('newHeading').value);
+            const newAltitude = parseFloat(document.getElementById('newAltitude').value);
+            const newSpeed = parseFloat(document.getElementById('newSpeed').value);
+            if (!isNaN(newHeading)) flight.targetHeading = newHeading * Math.PI / 180;
+            if (!isNaN(newAltitude)) flight.targetAltitude = newAltitude * 100;
+            if (!isNaN(newSpeed)) {
+                flight.baseSpeed = newSpeed / 3600;
+                flight.speed = newSpeed / 3600;
+            }
+        }
+        function removeFlight() {
+            const select = document.getElementById('flightList');
+            const index = select.selectedIndex;
+            if (index !== -1) {
+                flights.splice(index, 1);
+                updateFlightList();
+            }
+        }
+        function updateFlightList() {
+            const select = document.getElementById('flightList');
+            select.innerHTML = '';
+            flights.forEach((flight, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.text = `${flight.callsign} FL${Math.round(flight.altitude / 100)} ${Math.round(flight.speed * 3600)}kts`;
+                select.appendChild(option);
+            });
+        }
+        function addWeather() {
+            const id = document.getElementById('weatherId').value.trim().toUpperCase();
+            const x = parseFloat(document.getElementById('weatherX').value);
+            const y = parseFloat(document.getElementById('weatherY').value);
+            const radius = parseFloat(document.getElementById('weatherRadius').value);
+            const severity = document.getElementById('weatherSeverity').value;
+            if (id && !isNaN(x) && !isNaN(y) && !isNaN(radius)) {
+                weatherAreas.push(new Weather(id, x, y, radius, severity));
+                updateWeatherList();
+                document.getElementById('weatherId').value = '';
+            } else {
+                alert('Please fill in all weather fields correctly.');
+            }
+        }
+        function removeWeather() {
+            const select = document.getElementById('weatherList');
+            const index = select.selectedIndex;
+            if (index !== -1) {
+                weatherAreas.splice(index, 1);
+                updateWeatherList();
+            }
+        }
+        function updateWeatherList() {
+            const select = document.getElementById('weatherList');
+            select.innerHTML = '';
+            weatherAreas.forEach((weather, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.text = `${weather.id} (${weather.severity})`;
+                select.appendChild(option);
+            });
+        }
+        function addRunway() {
+            const name = document.getElementById('runwayName').value.trim().toUpperCase();
+            const x1 = parseFloat(document.getElementById('runwayX1').value);
+            const y1 = parseFloat(document.getElementById('runwayY1').value);
+            const x2 = parseFloat(document.getElementById('runwayX2').value);
+            const y2 = parseFloat(document.getElementById('runwayY2').value);
+            if (name && !isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                runways.push({ name, x1, y1, x2, y2 });
+                updateRunwayList();
+                document.getElementById('runwayName').value = '';
+            } else {
+                alert('Please fill in all runway fields correctly.');
+            }
+        }
+        function removeRunway() {
+            const select = document.getElementById('runwayList');
+            const index = select.selectedIndex;
+            if (index !== -1) {
+                runways.splice(index, 1);
+                updateRunwayList();
+            }
+        }
+        function updateRunwayList() {
+            const select = document.getElementById('runwayList');
+            select.innerHTML = '';
+            runways.forEach((runway, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.text = runway.name;
+                select.appendChild(option);
+            });
+        }
+        function addTaxiway() {
+            const name = document.getElementById('taxiwayName').value.trim().toUpperCase();
+            const pointsStr = document.getElementById('taxiwayPoints').value.trim();
+            const points = pointsStr.split(';').map(p => {
+                const [x, y] = p.split(',').map(parseFloat);
+                return { x, y };
+            }).filter(p => !isNaN(p.x) && !isNaN(p.y));
+            if (name && points.length >= 2) {
+                taxiways.push({ name, points });
+                updateTaxiwayList();
+                document.getElementById('taxiwayName').value = '';
+                document.getElementById('taxiwayPoints').value = '';
+            } else {
+                alert('Please provide a valid taxiway name and at least two points (x,y;x,y).');
+            }
+        }
+        function removeTaxiway() {
+            const select = document.getElementById('taxiwayList');
+            const index = select.selectedIndex;
+            if (index !== -1) {
+                taxiways.splice(index, 1);
+                updateTaxiwayList();
+            }
+        }
+        function updateTaxiwayList() {
+            const select = document.getElementById('taxiwayList');
+            select.innerHTML = '';
+            taxiways.forEach((taxiway, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.text = taxiway.name;
+                select.appendChild(option);
+            });
+        }
+        function addGate() {
+            const name = document.getElementById('gateName').value.trim().toUpperCase();
+            const x = parseFloat(document.getElementById('gateX').value);
+            const y = parseFloat(document.getElementById('gateY').value);
+            if (name && !isNaN(x) && !isNaN(y)) {
+                gates.push({ name, x, y });
+                updateGateList();
+                document.getElementById('gateName').value = '';
+            } else {
+                alert('Please fill in all gate fields correctly.');
+            }
+        }
+        function removeGate() {
+            const select = document.getElementById('gateList');
+            const index = select.selectedIndex;
+            if (index !== -1) {
+                gates.splice(index, 1);
+                updateGateList();
+            }
+        }
+        function updateGateList() {
+            const select = document.getElementById('gateList');
+            select.innerHTML = '';
+            gates.forEach((gate, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.text = gate.name;
+                select.appendChild(option);
+            });
+        }
+        function checkConflicts() {
+            for (let i = 0; i < flights.length; i++) {
+                for (let j = i + 1; j < flights.length; j++) {
+                    const f1 = flights[i];
+                    const f2 = flights[j];
+                    const dist = Math.hypot(f1.x - f2.x, f1.y - f2.y);
+                    const altDiff = Math.abs(f1.altitude - f2.altitude);
+                    if (dist < 5 && altDiff < 1000) {
+                        return `${f1.callsign} and ${f2.callsign} conflict!`;
+                    }
+                }
+            }
+            return null;
+        }
+        let lastTime = performance.now();
+        function animate() {
+            const currentTime = performance.now();
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 50 * scale, 0, Math.PI * 2);
+            ctx.stroke();
+            for (let r = 10; r <= 50; r += 10) {
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, r * scale, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            const waypoints = [
+                { name: 'WP1', x: 20, y: 20 },
+                { name: 'WP2', x: -20, y: 20 },
+                { name: 'WP3', x: -20, y: -20 },
+                { name: 'WP4', x: 20, y: -20 }
+            ];
+            ctx.fillStyle = '#0f0';
+            ctx.font = '10px Courier New';
+            waypoints.forEach(wp => {
+                ctx.beginPath();
+                ctx.arc(centerX + wp.x * scale, centerY - wp.y * scale, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillText(wp.name, centerX + wp.x * scale + 5, centerY - wp.y * scale);
+            });
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 4;
+            ctx.fillStyle = 'white';
+            runways.forEach(runway => {
+                ctx.beginPath();
+                ctx.moveTo(centerX + runway.x1 * scale, centerY - runway.y1 * scale);
+                ctx.lineTo(centerX + runway.x2 * scale, centerY - runway.y2 * scale);
+                ctx.stroke();
+                ctx.fillText(runway.name, centerX + runway.x1 * scale + 5, centerY - runway.y1 * scale);
+            });
+            ctx.strokeStyle = 'blue';
+            ctx.lineWidth = 2;
+            taxiways.forEach(taxiway => {
+                ctx.beginPath();
+                taxiway.points.forEach((p, i) => {
+                    const px = centerX + p.x * scale;
+                    const py = centerY - p.y * scale;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                });
+                ctx.stroke();
+                ctx.fillStyle = 'blue';
+                ctx.fillText(taxiway.name, centerX + taxiway.points[0].x * scale + 5, centerY - taxiway.points[0].y * scale);
+            });
+            ctx.fillStyle = 'white';
+            gates.forEach(gate => {
+                ctx.beginPath();
+                ctx.rect(centerX + gate.x * scale - 3, centerY - gate.y * scale - 3, 6, 6);
+                ctx.fill();
+                ctx.fillText(gate.name, centerX + gate.x * scale + 5, centerY - gate.y * scale);
+            });
+            weatherAreas.forEach(weather => {
+                ctx.beginPath();
+                ctx.arc(centerX + weather.x * scale, centerY - weather.y * scale, weather.radius * scale, 0, Math.PI * 2);
+                ctx.fillStyle = weather.severity === 'severe' ? 'rgba(255, 0, 0, 0.3)' :
+                                weather.severity === 'moderate' ? 'rgba(255, 255, 0, 0.3)' : 'rgba(0, 255, 0, 0.3)';
+                ctx.fill();
+                ctx.strokeStyle = ctx.fillStyle;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.fillStyle = 'white';
+                ctx.fillText(weather.id, centerX + weather.x * scale + 5, centerY - weather.y * scale);
+            });
+            sweepAngle = (sweepAngle + 60 * deltaTime) % 360;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + 50 * scale * Math.cos(sweepAngle * Math.PI / 180), centerY - 50 * scale * Math.sin(sweepAngle * Math.PI / 180));
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.font = '12px Courier New';
+            for (let i = flights.length - 1; i >= 0; i--) {
+                if (!flights[i].update(deltaTime)) {
+                    flights.splice(i, 1);
+                    updateFlightList();
+                    continue;
+                }
+                const flight = flights[i];
+                flight.history.forEach((pos, idx) => {
+                    ctx.fillStyle = `rgba(0, 255, 0, ${0.2 * (1 - idx / flight.history.length)})`;
+                    ctx.beginPath();
+                    ctx.arc(centerX + pos.x * scale, centerY - pos.y * scale, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                ctx.fillStyle = '#0f0';
+                ctx.beginPath();
+                ctx.rect(centerX + flight.x * scale - 3, centerY - flight.y * scale - 3, 6, 6);
+                ctx.fill();
+                ctx.fillStyle = '#0f0';
+                const dataBlock = [
+                    flight.callsign,
+                    `FL${Math.round(flight.altitude / 100)} ${Math.round(flight.speed * 3600)}KT`,
+                    `${Math.round(flight.heading * 180 / Math.PI).toString().padStart(3, '0')}°`
+                ];
+                dataBlock.forEach((line, idx) => {
+                    ctx.fillText(line, centerX + flight.x * scale + 10, centerY - flight.y * scale + idx * 12);
+                });
+            }
+            const conflict = checkConflicts();
+            if (conflict) {
+                ctx.fillStyle = 'red';
+                ctx.fillText(`CONFLICT: ${conflict}`, 10, 20);
+            }
+            document.getElementById('utcTime').textContent = new Date().toUTCString().slice(17, 22);
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
+</body>
+</html>
